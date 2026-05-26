@@ -10,3 +10,4 @@ build/
 *.egg-info/
 .DS_Store
 research_memory.json
+report_*.md
