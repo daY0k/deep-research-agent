@@ -1,121 +1,118 @@
 # Deep Research Agent
 
-A multi-agent AI system that researches any topic by deploying specialized agents in parallel — built on **Claude claude-sonnet-4-6** and the **Anthropic SDK**.
+Multi-agent AI system that researches any topic: decomposes the question, runs parallel web searches, critiques findings, and synthesizes a structured report.
 
-![Architecture](https://img.shields.io/badge/Claude-claude--sonnet--4--6-blueviolet) ![Python](https://img.shields.io/badge/Python-3.11+-blue) ![Streamlit](https://img.shields.io/badge/UI-Streamlit-red)
+Built on **Claude claude-sonnet-4-6** + **Anthropic SDK**. No LangChain, no LlamaIndex — just the raw API.
 
-## Architecture
+[![Stars](https://img.shields.io/github/stars/daY0k/deep-research-agent?style=flat-square&color=171717)](https://github.com/daY0k/deep-research-agent/stargazers)
+[![Python](https://img.shields.io/badge/Python-3.11+-171717?style=flat-square)](https://python.org)
+[![License](https://img.shields.io/badge/License-MIT-171717?style=flat-square)](LICENSE)
+
+---
+
+## How it works
 
 ```
-User Query
+User query
     │
     ▼
-┌─────────────────────────────────────────┐
-│           Orchestrator Agent            │
-│   Decomposes question → 3-5 sub-queries │
-└─────────────────┬───────────────────────┘
-                  │
-        ┌─────────┼─────────┐
-        ▼         ▼         ▼
-  [Researcher] [Researcher] [Researcher]   ← parallel
-        │         │         │
-        └─────────┼─────────┘
-                  ▼
-         ┌────────────────┐
-         │  Critic Agent  │
-         │ Gaps · Issues  │
-         └───────┬────────┘
-                 ▼
-       ┌──────────────────┐
-       │ Synthesizer Agent│
-       │   Final Report   │
-       └──────────────────┘
+Orchestrator          decomposes into 3-5 sub-queries
+    │
+    ├── Researcher ─┐
+    ├── Researcher  ├─ run in parallel, each does web_search + fetch_page
+    └── Researcher ─┘
+    │
+    ▼
+Critic                finds gaps, contradictions, weak sources
+    │
+    ▼
+Synthesizer           writes the final Markdown report
 ```
 
-Each agent is an independent Claude instance with its own system prompt and tool set.
+Each agent is an independent Claude instance with its own system prompt and tool access. The Orchestrator just coordinates — it doesn't do the research itself.
+
+---
 
 ## Features
 
-- **Parallel research** — multiple Researcher agents run simultaneously
-- **Self-critique** — Critic agent identifies gaps and contradictions
-- **Structured reports** — Markdown output with Executive Summary, Key Findings, Analysis, Sources
-- **Web search** — built-in DuckDuckGo search + page fetcher (no API key)
-- **Session memory** — tracks all agent steps with timestamps
-- **Streamlit UI** — live agent log, tabbed results, Markdown download
-- **CLI support** — run headless from terminal
+- **Parallel agents** — researchers run concurrently via `asyncio.gather`, not one-by-one
+- **Real web search** — DuckDuckGo HTML scraper + httpx page fetcher, zero API keys needed
+- **Tool use** — proper Claude `tool_use` loop, not prompt stuffing
+- **Self-critique** — dedicated Critic agent flags issues before the final report
+- **Streamlit UI** — live agent log, tabbed output, one-click Markdown download
+- **CLI** — headless mode, saves `report_TIMESTAMP.md`
+- **Custom endpoints** — supports `ANTHROPIC_BASE_URL` for proxies
 
-## Quick Start
+---
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| LLM | Claude claude-sonnet-4-6 |
+| SDK | `anthropic` (official) |
+| Concurrency | `asyncio` + `asyncio.gather` |
+| Web | `httpx` + `beautifulsoup4` |
+| UI | Streamlit |
+| Language | Python 3.11+ |
+
+---
+
+## Quick start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/deep-research-agent
+git clone https://github.com/daY0k/deep-research-agent
 cd deep-research-agent
 
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python3 -m venv .venv && source .venv/bin/activate
 
 pip install -r requirements.txt
 
 cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
-
-# Web UI
-streamlit run ui/app.py
-
-# CLI
-python -m src.cli "What are the best practices for building AI agents in 2025?"
+# Add your ANTHROPIC_API_KEY to .env
 ```
 
-## CLI Usage
-
+**Web UI:**
 ```bash
-python -m src.cli "Your research question here"
+streamlit run ui/app.py
 ```
 
-Output is saved to `report_<timestamp>.md`.
+**CLI:**
+```bash
+python3 -m src.cli "What are the best practices for building production AI agents?"
+```
 
-## Project Structure
+---
+
+## Project layout
 
 ```
 deep-research-agent/
 ├── src/
 │   ├── agents/
-│   │   ├── base.py          # Base agent (Claude + tool loop)
-│   │   ├── orchestrator.py  # Decomposes query, runs pipeline
+│   │   ├── base.py          # Claude API wrapper with tool loop
+│   │   ├── orchestrator.py  # Query decomposition + pipeline coordinator
 │   │   ├── researcher.py    # Web search + page reading
-│   │   ├── critic.py        # Evaluates findings
-│   │   └── synthesizer.py   # Writes final report
+│   │   ├── critic.py        # Findings evaluation
+│   │   └── synthesizer.py   # Final report writer
 │   ├── tools/
-│   │   └── web_search.py    # DuckDuckGo search + HTTP fetcher
+│   │   └── web_search.py    # DuckDuckGo + httpx fetcher + tool definitions
 │   └── memory/
-│       └── session.py       # In-memory + optional JSON persistence
+│       └── session.py       # Step logging with optional JSON persistence
 ├── ui/
-│   └── app.py               # Streamlit web interface
+│   └── app.py               # Streamlit interface
 ├── tests/
-│   └── test_pipeline.py     # Integration tests
-├── requirements.txt
-├── .env.example
-└── README.md
+│   └── test_pipeline.py     # Unit tests (mocked API)
+└── requirements.txt
 ```
 
-## Tech Stack
+---
 
-| Component | Technology |
-|---|---|
-| LLM | Claude claude-sonnet-4-6 (Anthropic) |
-| Agent framework | Custom (Anthropic SDK) |
-| Web search | DuckDuckGo HTML · httpx · BeautifulSoup4 |
-| UI | Streamlit |
-| Memory | In-memory + JSON persistence |
-| Language | Python 3.11+ |
+## Why no LangChain
 
-## Why This Project
+LangChain adds abstraction over things that don't need abstracting. The Anthropic SDK's `tool_use` loop is ~20 lines. Adding a framework on top would make the code harder to read and harder to interview about. Everything here is explicit.
 
-Demonstrates core AI engineering skills:
-- **Agentic design patterns** — orchestrator/worker decomposition
-- **Tool use** — Claude tool_use API with real web search
-- **Async concurrency** — parallel agent execution with `asyncio.gather`
-- **Multi-turn conversations** — proper message history management
-- **Production patterns** — error handling, memory, streaming-ready architecture
+---
 
 ## License
 
